@@ -1,31 +1,41 @@
 import RPi.GPIO as GPIO
 import time
-import datetime
+from datetime import datetime
 import os
+import daemon
+import lockfile
+import csv
 
-GPIO.setmode(GPIO.BCM)
-SOUND_PIN = 16
-GPIO.setup(SOUND_PIN, GPIO.IN)
+def detect_sound():
+    GPIO.setmode(GPIO.BCM)
+    SOUND_PIN = 16
+    GPIO.setup(SOUND_PIN, GPIO.IN)
 
-count = 0
+    def DETECTED(SOUND_PIN):
+        datafile = open('data/sound.csv', 'a+', newline='')
+        with datafile:
+            header = ['year', 'month', 'day', 'hour', 'minutes', 'seconds', 'sound_cnt']
+            now = datetime.now()
+            writer = csv.DictWriter(datafile, fieldnames = header)
+            writer.writerow(
+                {
+                    'year' : now.strftime("%Y"), 
+                    'month': now.strftime("%m"), 
+                    'day': now.strftime("%d"),
+                    'hour': now.strftime("%H"),
+                    'minutes': now.strftime("%M"),
+                    'seconds': now.strftime("%S"),
+                    'sound_cnt': 1,
+                }
+            )
 
-def DETECTED(SOUND_PIN):
-   global count
-   nowtime = datetime.datetime.now()
-   count += 1
+    try:
+        GPIO.add_event_detect(SOUND_PIN, GPIO.RISING, callback=DETECTED)
+        while True:
+            time.sleep(1000)
+    except KeyboardInterrupt:
+        print(" Quit")
+        GPIO.cleanup()
 
-   print("Sound Detected! " + str(nowtime) + " " + str(count))
-   #os.system("/home/pi/scripts/playfile.py")
-
-   return nowtime
-print("Sound Module Test (CTRL+C to exit)")
-time.sleep(2)
-print("Ready")
-
-try:
-   GPIO.add_event_detect(SOUND_PIN, GPIO.RISING, callback=DETECTED)
-   while 1:
-      time.sleep(100)
-except KeyboardInterrupt:
-   print(" Quit")
-   GPIO.cleanup()
+#with daemon.DaemonContext(pidfile=lockfile.FileLock('./sound_detector.pid')):
+detect_sound()
